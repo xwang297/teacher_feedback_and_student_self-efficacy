@@ -14,7 +14,7 @@ library(mice)
 library(naniar)
 
 # Load data
-data <- read_dta("/Users/xuewang/Desktop/Research/PISA 2018 causal/R code/USA_causal.dta")
+data <- read_dta("xxxx/USA_causal.dta") ## put in your working directory
 
 
 ############### Missing data information
