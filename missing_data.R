@@ -16,14 +16,16 @@ library(naniar)
 # Load data
 data <- read_dta("xxxx/USA_causal.dta") ## put in your working directory
 
+## See Stata code for variable name transformation ##
 
 ############### Missing data information
 # Load necessary library
 library(dplyr)
 
+
 # Define the variable list
-variables <- c("efficacy", "highpf", "female", "ESCS", "pv2read", 
-               "JOYREAD", "COMPETE", "wellbeing", "peerlation", 
+variables <- c("ST161Q01HA", "ST161Q02HA", "ST161Q03HA", "highpf", "female", "ESCS", "pv2read", 
+               "JOYREAD", "COMPETE", "wellbeing", "ST034Q01TA", "ST034Q02TA", "ST034Q04TA", "ST034Q06TA", 
                "parecoura", "stutearela")
 
 # Function to calculate missing values and their percentages
@@ -42,10 +44,12 @@ missing_summary <- missing_info(data, variables)
 print(missing_summary)
 
 
+
 ############### Little’s MCAR Test
 
-vars <- c("efficacy", "potafeed", "female", "ESCS", "pv2read",  
-          "JOYREAD", "COMPETE", "wellbeing", "peerlation", "parecoura", "stutearela")
+vars <- c("ST161Q01HA", "ST161Q02HA", "ST161Q03HA", "highpf", "female", "ESCS", "pv2read", 
+          "JOYREAD", "COMPETE", "wellbeing", "ST034Q01TA", "ST034Q02TA", "ST034Q04TA", "ST034Q06TA", 
+          "parecoura", "stutearela")
 df <-data[vars]
 result <- naniar::mcar_test(df)
 print(result)
@@ -53,6 +57,19 @@ print(result)
 
 
 ############### Logistic regression to predict missingness
+## generate composite var for self-efficacy
+data$efficacy <- ifelse(!is.na(data$ST161Q01HA) & !is.na(data$ST161Q02HA) & !is.na(data$ST161Q03HA), 
+                        (data$ST161Q01HA + data$ST161Q02HA + data$ST161Q03HA) / 3, NA)
+
+
+## generate composite var for peer relationships
+# Reverse code ST034Q02TA
+data$ST034Q02TA_r <- ifelse(!is.na(data$ST034Q02TA), 5 - data$ST034Q02TA, NA)
+
+# Generate peerlation variable
+data$peerlation <- ifelse(!is.na(data$ST034Q01TA) & !is.na(data$ST034Q02TA_r) & 
+                          !is.na(data$ST034Q04TA) & !is.na(data$ST034Q06TA), 
+                        (data$ST034Q01TA + data$ST034Q02TA_r + data$ST034Q04TA + data$ST034Q06TA) / 4, NA)
 
 data$missing_efficacy <- ifelse(is.na(data$efficacy), 1, 0)
 
