@@ -1,7 +1,7 @@
 # Positive Teacher Feedback and Student Self-efficacy: A Potential Outcomes Approach
  
 
-Authors: Xue Wang, Qiyang Zhang, and Marcia Davis
+Authors: Xue Wang, Qiyang Zhang, and Marcia H. Davis
 
 
 
