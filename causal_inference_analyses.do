@@ -27,9 +27,19 @@ use "$data_path/USA_causal.dta", clear // from USA sample of student questionnai
 
 ** Outcome variable: Reading self efficacy
 
-//rename ST161Q02HA efficacy // I am able to understand difficult texts
+/* 
+ST161Q01HA = I am a good reader.
+ST161Q02HA = I am able to understand difficult texts
+ST161Q03HA = I read fluently.
+*/
 
-des efficacy
+// create composite variable for reading self-efficacy
+ssc install mdesc
+mdesc ST161Q01HA ST161Q02HA ST161Q03HA // 115(2.42)  125(2.63)  156(3.28)
+alpha ST161Q01HA ST161Q02HA ST161Q03HA //0.85
+generate efficacy = (ST161Q01HA + ST161Q02HA + ST161Q03HA) / 3 if ST161Q01HA!=. & ST161Q02HA!=. & ST161Q03HA!=.
+mdesc efficacy //185 (3.89)
+
 
 ** Causal variable: Positive teacher feedback
 
@@ -48,7 +58,12 @@ JOYREAD: Enjoyment of reading;
 COMPETE: Competitiveness
 wellbeing: ST016Q01NA: Overall, how satisfied are you with your life as a whole these days?; 
 parecoura: ST123Q04NA
-peerlation: ST034Q02TA: I make friends easily at school. 1=strongly agree
+peerlation: 
+	ST034Q01TA: I feel like an outsider (or left out of things) at school.
+	ST034Q02TA: I make friends easily at school. 
+	ST034Q04TA: I feel awkward and out of place in my school.
+	ST034Q06TA: I feel lonely at school.
+	
 stutearela: ST097Q01TA: Students don't listen to what the teacher says.
 
 gen female = 0
@@ -56,6 +71,14 @@ replace female = 1 if ST004D01T == 1
 replace female = . if ST004D01T == .
 
 */
+
+// create composite variable for peer relationships
+generate ST034Q02TA_r = 5 - ST034Q02TA if ST034Q02TA != . //reverse code ST034Q02TA
+alpha ST034Q01TA ST034Q02TA_r ST034Q04TA ST034Q06TA //0.82
+generate peerlation = (ST034Q01TA + ST034Q02TA_r + ST034Q04TA + ST034Q06TA) / 4 if ST034Q01TA!=. & ST034Q02TA_r!=. & ST034Q04TA!=. & ST034Q06TA!=.
+mdesc peerlation //259 (5.44)
+
+
 
 
 *******************************  Descriptive results  *******************************
@@ -118,9 +141,6 @@ repest PISA, estimate(stata: reg $outcome $treatment $confound pv@read) by(cnt) 
 ***********************************
 * Logistic regression with plausible values
 ***********************************
-
-global outcome efficacy // reading self-efficacy
-global treatment highpf // higher teacher positive feedback
 
 // Define survey design
 svyset [pweight=w_fstuwt], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
@@ -232,9 +252,6 @@ summarize estpscore_mean, detail
 ***********************************
 * Matching with plausible values with variance accounting for within-imputation and between-imputation variance
 ***********************************
-global outcome efficacy // reading self-efficacy
-global treatment highpf // higher teacher positive feedback
-global confound female ESCS JOYREAD COMPETE wellbeing peerlation parecoura stutearela
 
 // Define survey design
 svyset [pweight=w_fstuwt], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
@@ -374,7 +391,7 @@ foreach est in nn_ate nn_att nn_atc kernel_ate kernel_att kernel_atc {
 *******************************************************************************
 *** weighting with plausible values (including all covariates) with variance accounting for within-imputation and between-imputation variance
 *******************************************************************************
-
+drop estpscore_1 estpscore_2 estpscore_3 estpscore_4 estpscore_5 estpscore_6 estpscore_7 estpscore_8 estpscore_9 estpscore_10
 // Get the list of all covariates
 local covariates $confound `pv'
 
@@ -475,6 +492,10 @@ foreach est in att atc {
 *******************************************************************************
 *** weighting with plausible values and common support restriction
 *******************************************************************************
+drop estpscore_1 estpscore_2 estpscore_3 estpscore_4 estpscore_5 estpscore_6 estpscore_7 estpscore_8 estpscore_9 estpscore_10
+
+drop w_att_1 w_att_2 w_att_3 w_att_4 w_att_5 w_att_6 w_att_7 w_att_8 w_att_9 w_att_10
+drop w_atc_1 w_atc_2 w_atc_3 w_atc_4 w_atc_5 w_atc_6 w_atc_7 w_atc_8 w_atc_9 w_atc_10
 
 // Get the list of all covariates
 local covariates $confound
@@ -590,126 +611,18 @@ foreach est in att atc {
     }
 }
 
+/* Balance Diagnostics */
+// Balance diagnostics for ATT weights
+svyset [pweight=w_att_2], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
+svy: mean female ESCS pv2read JOYREAD COMPETE wellbeing peerlation parecoura stutearela, over(highpf)
 
+// Balance diagnostics for ATC weights
+svyset [pweight=w_atc_2], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
+svy: mean female ESCS pv2read JOYREAD COMPETE wellbeing peerlation parecoura stutearela, over(highpf)
 
-*******************************************************************************
-*** weighting with plausible values and common support restriction
-*******************************************************************************
-
-// Get the list of all covariates
-local covariates $confound
-
-// Count the number of covariates
-local num_covariates: word count `covariates'
-
-// Initialize matrices to store results
-matrix att_results = J(10, 4 * (2 + `num_covariates' + 1), .)  // +1 for the plausible value
-matrix atc_results = J(10, 4 * (2 + `num_covariates' + 1), .)
-
-// Loop through plausible values
-forvalues i = 1/10 {
-    local pv = "pv`i'read"
-    
-    // Step 1: Estimate Propensity Scores
-    capture drop estpscore_`i' w_att_`i' w_atc_`i' in_support_`i'
-    svyset [pweight=w_fstuwt], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
-    quietly svy: logistic $treatment $confound `pv'
-    predict estpscore_`i', pr
-    
-    // Step 2: Determine common support region
-    sum estpscore_`i' if $treatment == 1
-    local min_treat = r(min)
-    local max_treat = r(max)
-    sum estpscore_`i' if $treatment == 0
-    local min_control = r(min)
-    local max_control = r(max)
-    
-    local min_common = max(`min_treat', `min_control')
-    local max_common = min(`max_treat', `max_control')
-    
-    // Generate indicator for common support
-    gen in_support_`i' = (estpscore_`i' >= `min_common' & estpscore_`i' <= `max_common')
-    
-    // Step 3: Generate IPW Weights for ATT and ATC (only for observations in common support)
-    gen w_att_`i' = estpscore_`i' * w_fstuwt / (1 - estpscore_`i') if in_support_`i' == 1
-    replace w_att_`i' = w_fstuwt if $treatment == 1 & in_support_`i' == 1
-    gen w_atc_`i' = (1 - estpscore_`i') * w_fstuwt / estpscore_`i' if in_support_`i' == 1
-    replace w_atc_`i' = w_fstuwt if $treatment == 0 & in_support_`i' == 1
-    
-    // Step 4: Estimate Treatment Effects
-    // ATT
-    svyset [pweight=w_att_`i'], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
-    quietly svy: regress $outcome $treatment $confound `pv' if in_support_`i' == 1
-    
-    local col = 1
-    foreach var in _cons $treatment $confound `pv' {
-        matrix att_results[`i', `col'] = _b[`var']
-        matrix att_results[`i', `col'+1] = _se[`var']
-        matrix att_results[`i', `col'+2] = _b[`var'] / _se[`var']
-        matrix att_results[`i', `col'+3] = 2 * ttail(e(df_r), abs(_b[`var'] / _se[`var']))
-        local col = `col' + 4
-    }
-    
-    // ATC
-    svyset [pweight=w_atc_`i'], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
-    quietly svy: regress $outcome $treatment $confound `pv' if in_support_`i' == 1
-    
-    local col = 1
-    foreach var in _cons $treatment $confound `pv' {
-        matrix atc_results[`i', `col'] = _b[`var']
-        matrix atc_results[`i', `col'+1] = _se[`var']
-        matrix atc_results[`i', `col'+2] = _b[`var'] / _se[`var']
-        matrix atc_results[`i', `col'+3] = 2 * ttail(e(df_r), abs(_b[`var'] / _se[`var']))
-        local col = `col' + 4
-    }
-    
-    // Display number of observations in common support
-    count if in_support_`i' == 1
-    di "Plausible value `i': Number of observations in common support = " r(N)
-}
-
-// Calculate combined estimates using Rubin's rules
-foreach est in att atc {
-    di "Results for `est' with common support restriction:"
-    di "------------------------------------------------"
-    
-    local col = 1
-    foreach var in _cons $treatment $confound `pv' {
-        // Calculate mean (Q-bar)
-        mata: st_numscalar("mean_`est'_`var'", mean(st_matrix("`est'_results")[.,`col']))
-        
-        // Calculate between-imputation variance (B)
-        mata: st_numscalar("between_var_`est'_`var'", variance(st_matrix("`est'_results")[.,`col']))
-        
-        // Calculate within-imputation variance (W-bar)
-        mata: st_numscalar("within_var_`est'_`var'", mean(st_matrix("`est'_results")[.,`col'+1]:^2))
-        
-        // Calculate total variance (T)
-        scalar total_var_`est'_`var' = within_var_`est'_`var' + (1 + 1/10) * between_var_`est'_`var'
-        
-        // Calculate standard error
-        scalar se_`est'_`var' = sqrt(total_var_`est'_`var')
-        
-        // Calculate degrees of freedom
-        scalar r_`est'_`var' = (between_var_`est'_`var' * (1 + 1/10)) / within_var_`est'_`var'
-        scalar df_`est'_`var' = (((10 + 1) / (3 * 10)) * ((1 / r_`est'_`var') ^ 2)) + (10 - 1)
-        
-        // Calculate t-statistic and p-value
-        scalar t_`est'_`var' = mean_`est'_`var' / se_`est'_`var'
-        scalar p_`est'_`var' = 2 * ttail(df_`est'_`var', abs(t_`est'_`var'))
-        
-        // Display results
-        di "`var' estimate: " mean_`est'_`var'
-        di "`var' standard error: " se_`est'_`var'
-        di "`var' t-statistic: " t_`est'_`var'
-        di "`var' degrees of freedom: " df_`est'_`var'
-        di "`var' p-value: " p_`est'_`var'
-        di ""
-        
-        local col = `col' + 4
-    }
-}
-
+// Balance diagnostics before inverse probability weighting
+svyset [pweight=w_fstuwt], brrweight(w_fsturwt1-w_fsturwt80) vce(brr)
+svy: mean female ESCS pv2read JOYREAD COMPETE wellbeing peerlation parecoura stutearela, over(highpf)
 
 
 ************************************************************************
