@@ -33,52 +33,136 @@ ST161Q02HA = I am able to understand difficult texts
 ST161Q03HA = I read fluently.
 */
 
+
 // create composite variable for reading self-efficacy
 ssc install mdesc
-mdesc ST161Q01HA ST161Q02HA ST161Q03HA // 115(2.42)  125(2.63)  156(3.28)
-alpha ST161Q01HA ST161Q02HA ST161Q03HA //0.85
 generate efficacy = (ST161Q01HA + ST161Q02HA + ST161Q03HA) / 3 if ST161Q01HA!=. & ST161Q02HA!=. & ST161Q03HA!=.
-mdesc efficacy //185 (3.89)
 
-
-** Causal variable: Positive teacher feedback
-
-//rename ST104Q02NA potafeed // The teacher gives me feedback on my strengths in this subject (test language)." 1= Never or almost never, 2=Some lessons, 3=Many lessons, and 4= Every lesson or almost every lesson.
-
-des potafeed 
-
+** Causal variable: Positive teacher feedback 
+//	The teacher gives me feedback on my strengths in this subject (test language)." 
+//	1= Never or almost never, 2=Some lessons, 3=Many lessons, and 4= Every lesson or almost every lesson.
+rename ST104Q02NA potafeed
+sum potafeed // M=2.47, SD=0.96
 
 ** Control variables
 
 /*  
-reading achievement: pv@read
-female: female=1, male=0; 
-ESCS: SES index; 
-JOYREAD: Enjoyment of reading; 
-COMPETE: Competitiveness
-wellbeing: ST016Q01NA: Overall, how satisfied are you with your life as a whole these days?; 
-parecoura: ST123Q04NA
-peerlation: 
-	ST034Q01TA: I feel like an outsider (or left out of things) at school.
-	ST034Q02TA: I make friends easily at school. 
-	ST034Q04TA: I feel awkward and out of place in my school.
-	ST034Q06TA: I feel lonely at school.
-	
-stutearela: ST097Q01TA: Students don't listen to what the teacher says.
+- reading achievement: pv@read // 10 plausible values
 
+- female: gender, female=1, male=0; 
 gen female = 0
 replace female = 1 if ST004D01T == 1
 replace female = . if ST004D01T == .
 
+- ESCS: SES index; 
+
+- JOYREAD: Enjoyment of reading; 1=Strongly disagree 4=Strongly agree
+	ST160Q01IA  I read only if I have to. 
+	ST160Q02IA  Reading is one of my favourite hobbies. 
+	ST160Q03IA  I like talking about books with other people. 
+	ST160Q04IA  For me, reading is a waste of time. 
+	ST160Q05IA  I read only to get information that I need. 
+
+- COMPETE: Competitiveness; 1=Strongly disagree 4=Strongly agree
+	ST181Q02HA  I enjoy working in situations involving competition with others. 
+	ST181Q03HA  It is important for me to perform better than other people on a task. 
+	ST181Q04HA  I try harder when I'm in competition with other people. 
+
+- SWBP: subjective wellbeing; 1=Never 2=Rarely 3=Sometimes 4=Always
+	Thinking about yourself and how you normally feel: how often do you feel as described below? 
+	(1=Never, 2=Rarely, 3=Sometimes, 4=Always)
+	ST186Q01HA Joyful
+	ST186Q03HA Cheerful
+	ST186Q05HA Happy
+
+- pasuppot: parental support; 1=Strongly disagree 4=Strongly agree
+	ST123Q02NA  My parents support my educational efforts and achievements. 
+	ST123Q03NA  My parents support me when I am facing difficulties at school. 
+	ST123Q04NA  My parents encourage me to be confident
+
+- BELONG: school belonging; 1=strongly agree 4=stronly disagree
+	ST034Q01TA I feel like an outsider (or left out of things) at school.
+	ST034Q02TA I make friends easily at school. 
+	ST034Q03TA I feel like I belong at school.
+	ST034Q04TA I feel awkward and out of place in my school.
+	ST034Q05TA Other students seem to like me.
+	ST034Q06TA I feel lonely at school.
+	
+- stearelation: student teacher relationships; 1=Strongly disagree 4=Strongly agree
+	ST211Q01HA  The teacher made me feel confident in my ability to do well in the course. 
+	ST211Q02HA  The teacher listened to my view on how to do things. 
+	ST211Q03HA  I felt that my teacher understood me. 
+
 */
 
-// create composite variable for peer relationships
-generate ST034Q02TA_r = 5 - ST034Q02TA if ST034Q02TA != . //reverse code ST034Q02TA
-alpha ST034Q01TA ST034Q02TA_r ST034Q04TA ST034Q06TA //0.82
-generate peerlation = (ST034Q01TA + ST034Q02TA_r + ST034Q04TA + ST034Q06TA) / 4 if ST034Q01TA!=. & ST034Q02TA_r!=. & ST034Q04TA!=. & ST034Q06TA!=.
-mdesc peerlation //259 (5.44)
+
+// generate composite variable for parental support
+generate pasuppot = (ST123Q02NA + ST123Q03NA + ST123Q04NA) / 3 if ST123Q02NA!=. & ST123Q03NA!=. & ST123Q04NA!=.
+
+// generate composite variable for student teacher relationships
+generate stearelation = (ST211Q01HA + ST211Q02HA + ST211Q03HA) / 3 if ST211Q01HA!=. & ST211Q02HA!=. & ST211Q03HA!=.
 
 
+** calculate cronbach alpha for efficacy, JOYREAD, COMPETE, SWBP, pasuppot, BELONG, stearelation
+
+// reading self-efficacy
+alpha ST161Q01HA ST161Q02HA ST161Q03HA // 0.85
+
+// JOYREAD
+* Reverse coding ST160Q01IA I read only if I have to.
+gen ST160Q01IA_rev = 5 - ST160Q01IA
+* Reverse coding ST160Q04IA For me, reading is a waste of time.
+gen ST160Q04IA_rev = 5 - ST160Q04IA
+* Reverse coding ST160Q05IA I read only to get information that I need.
+gen ST160Q05IA_rev = 5 - ST160Q05IA
+
+alpha ST160Q01IA_rev ST160Q02IA ST160Q03IA ST160Q04IA_rev ST160Q05IA_rev // 0.87
+
+// COMPETE
+alpha ST181Q02HA ST181Q03HA ST181Q04HA // 0.80
+
+// SWBP subjective wellbeing
+alpha ST186Q01HA ST186Q03HA ST186Q05HA // 0.85
+
+// parental support
+alpha ST123Q02NA ST123Q03NA ST123Q04NA // 0.90
+
+// BELONG school belonging
+* Reverse code ST034Q02TA I make friends easily at school
+gen ST034Q02TA_rev = 5 - ST034Q02TA
+* Reverse code ST034Q03TA I feel like I belong at school
+gen ST034Q03TA_rev = 5 - ST034Q03TA
+*Reverse code ST034Q05TA Other students seem to like me.
+gen ST034Q05TA_rev = 5 - ST034Q05TA
+alpha ST034Q01TA ST034Q02TA_rev ST034Q03TA_rev ST034Q04TA ST034Q05TA_rev ST034Q06TA // 0.84
+
+// stearelation student teacher relationships
+alpha ST211Q01HA ST211Q02HA ST211Q03HA //0.88
+
+
+*******************************  Calculate ICC with student final weights as pweights  *******************************
+* Run the null model with cluster-robust standard errors
+mixed efficacy || CNTSCHID:, vce(cluster CNTSCHID)
+
+estat icc //0.0222008
+
+* Apply student final weights
+// Set the survey design
+svyset CNTSCHID [pweight=w_fstuwt]
+
+// Scale the weights
+bysort CNTSCHID: egen sum_weight = sum(w_fstuwt)
+bysort CNTSCHID: egen n_students = count(w_fstuwt)
+gen scaled_weight = w_fstuwt * n_students / sum_weight
+
+// Fit the unconditional mixed-effects model with scaled weights
+mixed efficacy [pweight=scaled_weight] || CNTSCHID:
+
+// Calculate and display the ICC
+estat icc //.0222923
+
+// Clean up
+drop sum_weight n_students scaled_weight
 
 
 *******************************  Descriptive results  *******************************
